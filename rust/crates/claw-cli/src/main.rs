@@ -1119,47 +1119,67 @@ impl LiveCli {
         let has_claw_md = cwd
             .as_ref()
             .is_some_and(|path| path.join("CLAW.md").is_file());
+            
+        let is_auth_missing = matches!(resolve_cli_auth_source(), Ok(api::AuthSource::None));
+        let auth_status = if is_auth_missing {
+            if color { "\x1b[1;31m[ API Key Missing ]\x1b[0m ➜ Type \x1b[1;36m/login\x1b[0m to authenticate" } else { "[ API Key Missing ] ➜ Type /login to authenticate" }
+        } else {
+            if color { "\x1b[1;32m[ Authenticated ]\x1b[0m" } else { "[ Authenticated ]" }
+        };
+
+        let border_color = if color { "\x1b[1;38;5;46m" } else { "" };
+        let reset = if color { "\x1b[0m" } else { "" };
+        let title_color = if color { "\x1b[1;38;5;46m" } else { "" };
+        let dim = if color { "\x1b[2m" } else { "" };
+        let bold = if color { "\x1b[1m" } else { "" };
+        
         let mut lines = vec![
+            format!("{border_color}╭──{reset} {title_color}🌲 Open Saw{reset} {dim}· ready{reset} {border_color}────────────────────────────────────────────{reset}"),
+            format!("{border_color}│{reset}"),
+            format!("{border_color}│{reset}{bold}  Workspace{reset}        {workspace_summary}"),
+            format!("{border_color}│{reset}{bold}  Directory{reset}        {cwd_display}"),
+            format!("{border_color}│{reset}{bold}  Model{reset}            {}", self.model),
+            format!("{border_color}│{reset}{bold}  Permissions{reset}      {}", self.permission_mode.as_str()),
+            format!("{border_color}│{reset}{bold}  Auth Status{reset}      {auth_status}"),
+            format!("{border_color}│{reset}{bold}  Session{reset}          {}", self.session.id),
+            format!("{border_color}│{reset}"),
             format!(
-                "{} {}",
-                if color {
-                    "\x1b[1;38;5;46m🌲 Open Saw\x1b[0m"
-                } else {
-                    "Open Saw"
-                },
-                if color {
-                    "\x1b[2m· ready\x1b[0m"
-                } else {
-                    "· ready"
-                }
-            ),
-            format!("  Workspace        {workspace_summary}"),
-            format!("  Directory        {cwd_display}"),
-            format!("  Model            {}", self.model),
-            format!("  Permissions      {}", self.permission_mode.as_str()),
-            format!("  Session          {}", self.session.id),
-            format!(
-                "  Quick start      {}",
+                "{border_color}│{reset}{bold}  Quick start{reset}      {}",
                 if has_claw_md {
                     "/help · /status · ask for a task"
                 } else {
                     "/init · /help · /status"
                 }
             ),
-            "  Editor           Tab completes slash commands · /vim toggles modal editing"
-                .to_string(),
-            "  Multiline        Shift+Enter or Ctrl+J inserts a newline".to_string(),
+            format!("{border_color}│{reset}{bold}  Editor{reset}           Tab completes slash commands · /vim toggles modal editing"),
+            format!("{border_color}│{reset}{bold}  Multiline{reset}        Shift+Enter or Ctrl+J inserts a newline"),
         ];
+        
         if !has_claw_md {
             lines.push(
-                "  First run        /init scaffolds CLAW.md, .saw.json, and local session files"
-                    .to_string(),
+                format!("{border_color}│{reset}{bold}  First run{reset}        /init scaffolds CLAW.md, .saw.json, and local session files")
             );
         }
+        
+        lines.push(format!("{border_color}╰──────────────────────────────────────────────────────────────────{reset}"));
         lines.join("\n")
     }
 
     fn run_turn(&mut self, input: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // Prevent API calls if unauthenticated.
+        if matches!(resolve_cli_auth_source(), Ok(api::AuthSource::None)) {
+            let color = io::stdout().is_terminal();
+            let err_color = if color { "\x1b[1;31m" } else { "" };
+            let cmd_color = if color { "\x1b[1;36m" } else { "" };
+            let reset = if color { "\x1b[0m" } else { "" };
+            
+            println!("\n{err_color}✘ API Request Prevented{reset}");
+            println!("  You must configure an API provider before asking for tasks.");
+            println!("  Type {cmd_color}/login{reset} to start the auth flow, or configure your provider");
+            println!("  in settings.local.json / environment variables.\n");
+            return Ok(());
+        }
+
         let mut spinner = Spinner::new();
         let mut stdout = io::stdout();
         spinner.tick(
