@@ -39,6 +39,8 @@ use runtime::{
     Session, TokenUsage, ToolError, ToolExecutor, UsageTracker,
 };
 use serde_json::json;
+use crossterm::{execute, queue};
+use crossterm::style::{Color, Print, ResetColor, SetForegroundColor, Stylize, SetAttribute, Attribute};
 use tools::GlobalToolRegistry;
 
 const DEFAULT_MODEL: &str = "claude-opus-4-6";
@@ -1008,9 +1010,13 @@ fn run_repl(
     allowed_tools: Option<AllowedToolSet>,
     permission_mode: PermissionMode,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Enable ANSI color processing on Windows
+    #[cfg(windows)]
+    let _ = crossterm::execute!(io::stdout(), crossterm::terminal::SetTitle("Open Saw"));
+    let _ = crossterm::style::SetAttribute(crossterm::style::Attribute::Reset);
     let mut cli = LiveCli::new(model, true, allowed_tools, permission_mode)?;
     let mut editor = input::LineEditor::new("> ", slash_command_completion_candidates());
-    println!("{}", cli.startup_banner());
+    print_startup_banner(&cli);
 
     loop {
         match editor.read_line()? {
@@ -1097,115 +1103,223 @@ impl LiveCli {
         Ok(cli)
     }
 
-    fn startup_banner(&self) -> String {
-        let color = io::stdout().is_terminal();
-        let cwd = env::current_dir().ok();
-        let cwd_display = cwd.as_ref().map_or_else(
-            || "<unknown>".to_string(),
-            |path| path.display().to_string(),
-        );
-        let workspace_name = cwd
-            .as_ref()
-            .and_then(|path| path.file_name())
-            .and_then(|name| name.to_str())
-            .unwrap_or("workspace");
-        let git_branch = status_context(Some(&self.session.path))
-            .ok()
-            .and_then(|context| context.git_branch);
-        let workspace_summary = git_branch.as_deref().map_or_else(
-            || workspace_name.to_string(),
-            |branch| format!("{workspace_name} · {branch}"),
-        );
-        let has_claw_md = cwd
-            .as_ref()
-            .is_some_and(|path| path.join("CLAW.md").is_file());
-            
-        let is_auth_missing = matches!(resolve_cli_auth_source(), Ok(api::AuthSource::None));
-        let auth_status = if is_auth_missing {
-            if color { "\x1b[1;31m[ API Key Missing ]\x1b[0m ➜ Type \x1b[1;36m/login\x1b[0m to authenticate" } else { "[ API Key Missing ] ➜ Type /login to authenticate" }
-        } else {
-            if color { "\x1b[1;32m[ Authenticated ]\x1b[0m" } else { "[ Authenticated ]" }
-        };
+}
 
-        let border_color = if color { "\x1b[38;5;28m" } else { "" };
-        let reset = if color { "\x1b[0m" } else { "" };
-        let title_color = if color { "\x1b[1;38;5;46m" } else { "" };
-        let dim = if color { "\x1b[2m" } else { "" };
-        let bold = if color { "\x1b[1m" } else { "" };
-        
-        let ascii_art = [
-            "   ██████╗ ██████╗  ███████╗███╗   ██╗",
-            "  ██╔═══██╗██╔══██╗ ██╔════╝████╗  ██║",
-            "  ██║   ██║██████╔╝ █████╗  ██╔██╗ ██║",
-            "  ██║   ██║██╔═══╝  ██╔══╝  ██║╚██╗██║",
-            "  ╚██████╔╝██║      ███████╗██║ ╚████║",
-            "   ╚═════╝ ╚═╝      ╚══════╝╚═╝  ╚═══╝",
-            "     ███████╗ █████╗ ██╗    ██╗       ",
-            "     ██╔════╝██╔══██╗██║    ██║       ",
-            "     ███████╗███████║██║ █╗ ██║       ",
-            "     ╚════██║██╔══██║██║███╗██║       ",
-            "     ███████║██║  ██║╚███╔███╔╝       ",
-            "     ╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝        "
-        ];
-        
-        let mut lines = Vec::new();
-        
-        // Output gradient ASCII Art
-        let gradient_colors = ["46", "40", "34", "28"];
-        for (i, line) in ascii_art.iter().enumerate() {
-            let color_code = gradient_colors[i / 3];
-            if color {
-                lines.push(format!("\x1b[1;38;5;{}m{}\x1b[0m", color_code, line));
-            } else {
-                lines.push(line.to_string());
-            }
-        }
-        
-        lines.push(String::new());
-        
-        lines.push(format!("{border_color}╭──{reset} {title_color}Open Saw{reset} {dim}· ready{reset} {border_color}────────────────────────────────────────────{reset}"));
-        lines.push(format!("{border_color}│{reset}"));
-        lines.push(format!("{border_color}│{reset}{bold}  Workspace{reset}   {workspace_summary}"));
-        lines.push(format!("{border_color}│{reset}{bold}  Directory{reset}   {cwd_display}"));
-        lines.push(format!("{border_color}│{reset}{bold}  Model{reset}       {}", self.model));
-        lines.push(format!("{border_color}│{reset}{bold}  Permissions{reset} {}", self.permission_mode.as_str()));
-        lines.push(format!("{border_color}│{reset}{bold}  Auth Status{reset} {auth_status}"));
-        lines.push(format!("{border_color}│{reset}{bold}  Session{reset}     {}", self.session.id));
-        lines.push(format!("{border_color}│{reset}"));
-        
-        if is_auth_missing {
-            lines.push(format!("{border_color}│{reset}{bold}  Getting Started{reset}"));
-            lines.push(format!("{border_color}│{reset}   1. Type \x1b[1;36m/login\x1b[0m to authenticate via Anthropic API."));
-            lines.push(format!("{border_color}│{reset}   2. Type \x1b[1;36m/help\x1b[0m to explore the CLI syntax."));
-            lines.push(format!("{border_color}│{reset}"));
-        } else {
-            lines.push(format!(
-                "{border_color}│{reset}{bold}  Quick start{reset} {}",
-                if has_claw_md { "/help · /status · ask for a task" } else { "/init · /help · /status" }
-            ));
-            lines.push(format!("{border_color}│{reset}{bold}  Editor{reset}      Tab completes commands · /vim toggles modal"));
-            
-            if !has_claw_md {
-                lines.push(format!("{border_color}│{reset}{bold}  First run{reset}   /init scaffolds CLAW.md and config files"));
-            }
-        }
-        
-        lines.push(format!("{border_color}╰──────────────────────────────────────────────────────────────{reset}"));
-        lines.join("\n")
+fn print_startup_banner(cli: &LiveCli) {
+    let cwd = env::current_dir().ok();
+    let cwd_display = cwd.as_ref().map_or_else(
+        || "<unknown>".to_string(),
+        |path| path.display().to_string(),
+    );
+    let workspace_name = cwd
+        .as_ref()
+        .and_then(|path| path.file_name())
+        .and_then(|name| name.to_str())
+        .unwrap_or("workspace");
+    let git_branch = status_context(Some(&cli.session.path))
+        .ok()
+        .and_then(|context| context.git_branch);
+    let workspace_summary = git_branch.as_deref().map_or_else(
+        || workspace_name.to_string(),
+        |branch| format!("{workspace_name} · {branch}"),
+    );
+    let has_claw_md = cwd
+        .as_ref()
+        .is_some_and(|path| path.join("CLAW.md").is_file());
+    let is_auth_missing = matches!(resolve_cli_auth_source(), Ok(api::AuthSource::None));
+
+    let mut out = io::stdout();
+
+    // Green gradient colors for the ASCII art
+    let g1 = Color::AnsiValue(46);  // brightest green
+    let g2 = Color::AnsiValue(40);
+    let g3 = Color::AnsiValue(34);
+    let g4 = Color::AnsiValue(28);  // darkest green
+    let border = Color::AnsiValue(28);
+    let label_color = Color::AnsiValue(40);
+    let value_color = Color::White;
+
+    // --- ASCII art "OPEN SAW" ---
+    let ascii_lines: &[(&str, Color)] = &[
+        ("   ██████╗ ██████╗  ███████╗███╗   ██╗", g1),
+        ("  ██╔═══██╗██╔══██╗ ██╔════╝████╗  ██║", g1),
+        ("  ██║   ██║██████╔╝ █████╗  ██╔██╗ ██║", g1),
+        ("  ██║   ██║██╔═══╝  ██╔══╝  ██║╚██╗██║", g2),
+        ("  ╚██████╔╝██║      ███████╗██║ ╚████║", g2),
+        ("   ╚═════╝ ╚═╝      ╚══════╝╚═╝  ╚═══╝", g2),
+        ("     ███████╗ █████╗ ██╗    ██╗", g3),
+        ("     ██╔════╝██╔══██╗██║    ██║", g3),
+        ("     ███████╗███████║██║ █╗ ██║", g3),
+        ("     ╚════██║██╔══██║██║███╗██║", g4),
+        ("     ███████║██║  ██║╚███╔███╔╝", g4),
+        ("     ╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝", g4),
+    ];
+
+    for (line, color) in ascii_lines {
+        let _ = execute!(out,
+            SetAttribute(Attribute::Bold),
+            SetForegroundColor(*color),
+            Print(line),
+            ResetColor,
+            Print("\n")
+        );
     }
+
+    println!();
+
+    // --- Top border ---
+    let _ = execute!(out,
+        SetForegroundColor(border), Print("  ╭─"),
+        SetForegroundColor(g1), SetAttribute(Attribute::Bold), Print(" Open Saw "),
+        ResetColor,
+        SetForegroundColor(Color::DarkGrey), Print("· ready "),
+        SetForegroundColor(border), Print("──────────────────────────────────────╮"),
+        ResetColor, Print("\n")
+    );
+
+    // --- Info rows ---
+    let _ = execute!(out, SetForegroundColor(border), Print("  │"), ResetColor, Print("\n"));
+    
+    // Workspace
+    let _ = execute!(out,
+        SetForegroundColor(border), Print("  │  "),
+        SetForegroundColor(label_color), SetAttribute(Attribute::Bold), Print("Workspace     "),
+        ResetColor, SetForegroundColor(value_color), Print(&workspace_summary),
+        ResetColor, Print("\n")
+    );
+    // Directory
+    let _ = execute!(out,
+        SetForegroundColor(border), Print("  │  "),
+        SetForegroundColor(label_color), SetAttribute(Attribute::Bold), Print("Directory     "),
+        ResetColor, SetForegroundColor(value_color), Print(&cwd_display),
+        ResetColor, Print("\n")
+    );
+    // Model
+    let _ = execute!(out,
+        SetForegroundColor(border), Print("  │  "),
+        SetForegroundColor(label_color), SetAttribute(Attribute::Bold), Print("Model         "),
+        ResetColor, SetForegroundColor(value_color), Print(&cli.model),
+        ResetColor, Print("\n")
+    );
+    // Permissions
+    let _ = execute!(out,
+        SetForegroundColor(border), Print("  │  "),
+        SetForegroundColor(label_color), SetAttribute(Attribute::Bold), Print("Permissions   "),
+        ResetColor, SetForegroundColor(value_color), Print(cli.permission_mode.as_str()),
+        ResetColor, Print("\n")
+    );
+    // Auth Status
+    let _ = execute!(out, SetForegroundColor(border), Print("  │  "),
+        SetForegroundColor(label_color), SetAttribute(Attribute::Bold), Print("Auth          "),
+        ResetColor
+    );
+    if is_auth_missing {
+        let _ = execute!(out,
+            SetForegroundColor(Color::Red), SetAttribute(Attribute::Bold),
+            Print("✘ Not Configured"),
+            ResetColor, Print("\n")
+        );
+    } else {
+        let _ = execute!(out,
+            SetForegroundColor(Color::AnsiValue(46)), SetAttribute(Attribute::Bold),
+            Print("✔ Ready"),
+            ResetColor, Print("\n")
+        );
+    }
+    // Session
+    let _ = execute!(out,
+        SetForegroundColor(border), Print("  │  "),
+        SetForegroundColor(label_color), SetAttribute(Attribute::Bold), Print("Session       "),
+        ResetColor, SetForegroundColor(Color::DarkGrey), Print(&cli.session.id),
+        ResetColor, Print("\n")
+    );
+
+    // --- Divider ---
+    let _ = execute!(out, SetForegroundColor(border), Print("  │"), ResetColor, Print("\n"));
+
+    // --- Bottom section: Getting started or Quick start ---
+    if is_auth_missing {
+        let _ = execute!(out,
+            SetForegroundColor(border), Print("  │  "),
+            SetForegroundColor(g1), SetAttribute(Attribute::Bold),
+            Print("Getting Started"),
+            ResetColor, Print("\n")
+        );
+        let _ = execute!(out,
+            SetForegroundColor(border), Print("  │   "),
+            ResetColor,
+            Print("Set "),
+            SetForegroundColor(Color::Cyan), Print("ANTHROPIC_API_KEY"),
+            ResetColor, Print(" env var, or type "),
+            SetForegroundColor(Color::Cyan), SetAttribute(Attribute::Bold), Print("/login"),
+            ResetColor, Print("\n")
+        );
+        let _ = execute!(out,
+            SetForegroundColor(border), Print("  │   "),
+            ResetColor,
+            Print("Type "),
+            SetForegroundColor(Color::Cyan), SetAttribute(Attribute::Bold), Print("/help"),
+            ResetColor, Print(" to explore all commands"),
+            ResetColor, Print("\n")
+        );
+    } else {
+        let qs = if has_claw_md { "/help · /status · ask a task" } else { "/init · /help · /status" };
+        let _ = execute!(out,
+            SetForegroundColor(border), Print("  │  "),
+            SetForegroundColor(label_color), SetAttribute(Attribute::Bold), Print("Quick start   "),
+            ResetColor, SetForegroundColor(value_color), Print(qs),
+            ResetColor, Print("\n")
+        );
+        let _ = execute!(out,
+            SetForegroundColor(border), Print("  │  "),
+            SetForegroundColor(label_color), SetAttribute(Attribute::Bold), Print("Editor        "),
+            ResetColor, SetForegroundColor(value_color), Print("Tab completes · /vim toggles modal"),
+            ResetColor, Print("\n")
+        );
+        if !has_claw_md {
+            let _ = execute!(out,
+                SetForegroundColor(border), Print("  │  "),
+                SetForegroundColor(label_color), SetAttribute(Attribute::Bold), Print("First run     "),
+                ResetColor, SetForegroundColor(value_color), Print("/init scaffolds CLAW.md & config"),
+                ResetColor, Print("\n")
+            );
+        }
+    }
+
+    // --- Bottom border ---
+    let _ = execute!(out, SetForegroundColor(border), Print("  │"), ResetColor, Print("\n"));
+    let _ = execute!(out,
+        SetForegroundColor(border),
+        Print("  ╰──────────────────────────────────────────────────────────╯"),
+        ResetColor, Print("\n")
+    );
+
+    println!();
+}
+
+impl LiveCli {
 
     fn run_turn(&mut self, input: &str) -> Result<(), Box<dyn std::error::Error>> {
         // Prevent API calls if unauthenticated.
         if matches!(resolve_cli_auth_source(), Ok(api::AuthSource::None)) {
-            let color = io::stdout().is_terminal();
-            let err_color = if color { "\x1b[1;31m" } else { "" };
-            let cmd_color = if color { "\x1b[1;36m" } else { "" };
-            let reset = if color { "\x1b[0m" } else { "" };
-            
-            println!("\n{err_color}✘ API Request Prevented{reset}");
-            println!("  You must configure an API provider before asking for tasks.");
-            println!("  Type {cmd_color}/login{reset} to start the auth flow, or configure your provider");
-            println!("  in settings.local.json / environment variables.\n");
+            let mut stdout = io::stdout();
+            let _ = execute!(
+                stdout,
+                SetForegroundColor(Color::Red),
+                Print("\n✘ API Request Prevented\n"),
+                ResetColor,
+                Print("  You must configure an API provider before asking for tasks.\n"),
+                SetForegroundColor(Color::AnsiValue(46)),
+                Print("  Type "),
+                SetForegroundColor(Color::Cyan),
+                Print("/login"),
+                ResetColor,
+                Print(" to start the auth flow, or set "),
+                SetForegroundColor(Color::Cyan),
+                Print("ANTHROPIC_API_KEY"),
+                ResetColor,
+                Print(" env var.\n\n")
+            );
             return Ok(());
         }
 
