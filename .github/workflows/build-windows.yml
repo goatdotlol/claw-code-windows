@@ -1,0 +1,38 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        targets: x86_64-pc-windows-msvc
+
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: "rust -> target"
+
+    - name: Build Project
+      working-directory: ./rust
+      run: cargo build --release
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: claw-windows-exe
+        path: rust/target/release/claw.exe
+        if-no-files-found: error
