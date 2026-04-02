@@ -7,6 +7,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -36,3 +39,14 @@ jobs:
         name: claw-windows-exe
         path: rust/target/release/claw.exe
         if-no-files-found: error
+        
+    - name: Create Release and Upload
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: "latest"
+        name: "Claw Code Latest Release"
+        files: rust/target/release/claw.exe
+        body: "Automated release build."
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
