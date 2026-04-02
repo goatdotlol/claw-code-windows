@@ -35,7 +35,7 @@ jobs:
 
     - name: Convert Icon
       run: |
-        magick "icon refined.png" -define icon:auto-resize=256,128,64,48,32,16 icon.ico
+        magick icon_refined.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
         
     - name: Compile Inno Setup Installer
       run: |

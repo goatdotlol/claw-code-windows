@@ -1,15 +1,15 @@
 <div align="center">
 
-<img src="icon%20refined.png" width="100" alt="Open Saw Icon" />
+<img src="icon_refined.png" width="100" alt="Open Saw Icon" />
 
 # OPEN SAW 
 
 **Advanced Local Agent Protocol** <br/>
 *A deterministic, high-octane local coding agent optimized for speed and autonomy.*
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/goatdotlol/claw-code-windows/build-windows.yml?branch=main&style=for-the-badge&color=115e29)](https://github.com/goatdotlol/claw-code-windows/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-115e29.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/Language-Rust-115e29.svg?style=for-the-badge)](https://www.rust-lang.org/)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/goatdotlol/claw-code-windows/build-windows.yml?branch=main&style=for-the-badge&color=115e29&labelColor=052e12)](https://github.com/goatdotlol/claw-code-windows/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-115e29.svg?style=for-the-badge&labelColor=052e12)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/Language-Rust-115e29.svg?style=for-the-badge&labelColor=052e12)](https://www.rust-lang.org/)
 
 <br />
 
