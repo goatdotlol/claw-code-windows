@@ -18,9 +18,9 @@ Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu shortcut opens the command prompt explicitly so the CLI stays open
-Name: "{group}\Open Saw"; Filename: "cmd.exe"; Parameters: "/k ""{app}\saw.exe"""; IconFilename: "{app}\icon.ico"
+Name: "{group}\Open Saw"; Filename: "cmd.exe"; Parameters: "/k ""{app}\saw.exe"""; IconFilename: "{app}\icon.ico"; WorkingDir: "{userprofile}"
 ; Desktop shortcut opens the command prompt explicitly so the CLI stays open
-Name: "{autodesktop}\Open Saw"; Filename: "cmd.exe"; Parameters: "/k ""{app}\saw.exe"""; IconFilename: "{app}\icon.ico"
+Name: "{autodesktop}\Open Saw"; Filename: "cmd.exe"; Parameters: "/k ""{app}\saw.exe"""; IconFilename: "{app}\icon.ico"; WorkingDir: "{userprofile}"
 
 [Registry]
 ; Standard append to system PATH to allow the user to type "saw" in any terminal
