@@ -18,9 +18,11 @@ Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu shortcut opens the command prompt explicitly so the CLI stays open
-Name: "{group}\Open Saw"; Filename: "cmd.exe"; Parameters: "/k ""{app}\saw.exe"""; IconFilename: "{app}\icon.ico"; WorkingDir: "{userprofile}"
+Name: "{group}\Open Saw"; Filename: "cmd.exe"; Parameters: "/k ""{app}\saw.exe"""; IconFilename: "{app}\icon.ico"; WorkingDir: "{userdocs}"
 ; Desktop shortcut opens the command prompt explicitly so the CLI stays open
-Name: "{autodesktop}\Open Saw"; Filename: "cmd.exe"; Parameters: "/k ""{app}\saw.exe"""; IconFilename: "{app}\icon.ico"; WorkingDir: "{userprofile}"
+Name: "{autodesktop}\Open Saw"; Filename: "cmd.exe"; Parameters: "/k ""{app}\saw.exe"""; IconFilename: "{app}\icon.ico"; WorkingDir: "{userdocs}"
+; Adds an uninstall shortcut to easily remove the application
+Name: "{group}\Uninstall Open Saw"; Filename: "{uninstallexe}"
 
 [Registry]
 ; Standard append to system PATH to allow the user to type "saw" in any terminal
