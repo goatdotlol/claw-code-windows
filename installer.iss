@@ -10,6 +10,7 @@ SolidCompression=yes
 SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\saw.exe
 ChangesEnvironment=yes
+PrivilegesRequired=lowest
 
 [Files]
 Source: "rust\target\release\saw.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -23,7 +24,7 @@ Name: "{autodesktop}\Open Saw"; Filename: "cmd.exe"; Parameters: "/k ""{app}\saw
 
 [Registry]
 ; Standard append to system PATH to allow the user to type "saw" in any terminal
-Root: HKA; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath(ExpandConstant('{app}'))
+Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath(ExpandConstant('{app}'))
 
 [Code]
 function NeedsAddPath(Param: string): boolean;
